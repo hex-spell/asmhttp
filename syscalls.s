@@ -52,27 +52,26 @@ index_page:
     movq \len, %rdx #count of chars to print
     syscall
 .endm
+
+.macro lseek fd, off, origin
+    movq $8, %rax #sys_lseek
+    movq \fd, %rdi #file descriptor
+    movq \off, %rsi #offset
+    movq \origin, %rdx #origin
+    syscall
+.endm
 	
 .globl _start
 _start:
-	write $1, $hello, $13
-
 	open $index_page, $0, $0
-	
 	#check for file open error
 	#cmp %rax, $0
 	#je exit_program_error
 	movq %rax, open_fd
-	#stat syscall for file info
-	# !!! this is not changing file_stat, I have to fix that
-	fstat open_fd, $file_stat
-	#48 bytes offset for file size inside struct (st_size)
-	#allocate memory in the heap to read the file
-	movq $file_stat, %rbx
-	# !!! program segfaults here because rbx is 48
-	movq 48(%rbx), %rcx
-	movq %rcx, file_size
-	mmap $0, file_size, $0x1, $0x02, $-1, $0
+	lseek open_fd, $0, $2
+	movq %rax, file_size
+	lseek open_fd, $0, $0
+	mmap $0, file_size, $0x1, $0x22, $-1, $0
 	movq %rax, file_buff_ptr
 	read open_fd, $file_buff_ptr, file_size 
 	write $1, $file_buff_ptr, file_size
