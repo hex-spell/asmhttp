@@ -11,6 +11,7 @@ server_listening_msg:
 .lcomm socket_fd, 8
 .lcomm sockaddr, 8
 .lcomm current_client_fd, 8
+.lcomm current_data_addr, 8
 
 .text
 .macro write fd, buf, len
@@ -50,6 +51,12 @@ server_listening_msg:
     movq \flags, %r10 #memory updates visible to other processes or not
     movq \fd, %r8 #file descriptor in case we want to use swap mem
     movq \off, %r9 #offset
+    syscall
+.endm
+
+.macro brk brkl
+    movq $12, %rax #sys_brk
+    movq \brkl, %rdi #brk long
     syscall
 .endm
 
@@ -103,7 +110,7 @@ server_listening_msg:
 .globl _start
 _start:
 	#read index page file
-	open $index_page, $0, $0
+	open $index_page, $0x8000, $0
 
 	#check for file open error
 	#cmp %rax, $0
@@ -113,11 +120,17 @@ _start:
 	lseek html_fd, $0, $2
 	movq %rax, file_size
 	lseek html_fd, $0, $0
-	mmap $0, file_size, $0x1, $0x22, $-1, $0
+	#allocate memory for the website file
+	brk $0
 	movq %rax, file_buff_ptr
-	read html_fd, $file_buff_ptr, file_size 
+	addq file_size, %rax
+	movq %rax, current_data_addr
+	brk current_data_addr
+	#read the website file into memory
+	movq file_buff_ptr, %r14
+	read html_fd, %r14, file_size 
 	close html_fd
-	write $1, $file_buff_ptr, file_size
+	write $1, %r14, file_size
 
 	#start server
 	socket $2, $1, $0
@@ -146,7 +159,8 @@ accept_loop:
 	#null addr and addrlen, I don't care about the client for now
 	accept socket_fd, $0, $0 
 	movq %rax, current_client_fd
-	write current_client_fd, $file_buff_ptr, file_size
+	movq file_buff_ptr, %r14
+	write current_client_fd, %r14, file_size
 	close current_client_fd
 	jmp accept_loop
 
