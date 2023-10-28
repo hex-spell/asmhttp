@@ -1,23 +1,13 @@
 .data
 index_page:
     .string "./index.html\0"
-#struct sockaddr
-# short int sa_family (2 bytes)
-# char sa_data[14] (14 bytes)
-sockaddr:
-    .short 2
-    .string "\0""0808"
-    .string "\0""0.0.0.0"
 
 .bss
 .lcomm html_fd, 8
 .lcomm file_size, 8
 .lcomm file_buff_ptr, 8
 .lcomm socket_fd, 8
-#struct sockaddr
-# short int sa_family (2 bytes)
-# char sa_data[14] (14 bytes)
-.lcomm sockaddr, 16
+.lcomm sockaddr, 8
 
 .text
 .macro write fd, buf, len
@@ -85,7 +75,7 @@ sockaddr:
 .endm
 
 .macro bind fd, sockaddr, addrlen
-    movq $41, %rax #sys_socket
+    movq $49, %rax #sys_socket
     movq \fd, %rdi #socket fd
     movq \sockaddr, %rsi #sockaddr struct ptr
     movq \addrlen, %rdx #address length
@@ -98,8 +88,8 @@ _start:
 	open $index_page, $0, $0
 
 	#check for file open error
-	cmp %rax, $0
-	jle exit_program_error
+	#cmp %rax, $0
+	#jle exit_program_error
 
 	movq %rax, html_fd
 	lseek html_fd, $0, $2
@@ -115,11 +105,20 @@ _start:
 	socket $2, $1, $0
 
 	#check for socket open error
-	cmp %rax, $0
-	jle exit_program_error
+	#cmp %rax, $0
+	#jle exit_program_error
 
 	movq %rax, socket_fd
-	bind socket_fd, sockaddr_ptr, $0
+
+	#thank god I found this https://gist.github.com/geyslan/5174296
+	#I had no idea how to handle structs or the stack
+
+	push $0 #INADDR_ANY = 0 (uint32_t)
+	pushw $0x672b #port in byte reverse order = 11111 (uint16_t)
+	pushw $2 #AF_INET = 2 (unsigned short int)
+	movq %rsp, sockaddr #stack pointer = struct pointer atm
+
+	bind socket_fd, sockaddr, $16
 	close socket_fd
 	jmp exit_program
 
