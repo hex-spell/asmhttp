@@ -1,6 +1,8 @@
 .data
 index_page:
-    .string "./index.html\0"
+    .string "./index.http\0"
+server_listening_msg:
+    .string "chat server listening on port 11111\n\0"
 
 .bss
 .lcomm html_fd, 8
@@ -8,6 +10,7 @@ index_page:
 .lcomm file_buff_ptr, 8
 .lcomm socket_fd, 8
 .lcomm sockaddr, 8
+.lcomm current_client_fd, 8
 
 .text
 .macro write fd, buf, len
@@ -81,7 +84,22 @@ index_page:
     movq \addrlen, %rdx #address length
     syscall
 .endm
-	
+
+.macro listen sockfd, backlog
+    movq $50, %rax #sys_listen
+    movq \sockfd, %rdi
+    movq \backlog, %rsi #max length of incoming requests queue
+    syscall
+.endm
+
+.macro accept fd, sockaddr, addrlen
+    movq $43, %rax #sys_accept
+    movq \fd, %rdi #socket fd
+    movq \sockaddr, %rsi #sockaddr struct ptr
+    movq \addrlen, %rdx #address length
+    syscall
+.endm
+
 .globl _start
 _start:
 	#read index page file
@@ -117,8 +135,21 @@ _start:
 	pushw $0x672b #port in byte reverse order = 11111 (uint16_t)
 	pushw $2 #AF_INET = 2 (unsigned short int)
 	movq %rsp, sockaddr #stack pointer = struct pointer atm
-
+	
+	#TODO: err handling for bind and listen
 	bind socket_fd, sockaddr, $16
+	listen socket_fd, $128
+
+	write $1, $server_listening_msg, $37
+
+accept_loop:
+	#null addr and addrlen, I don't care about the client for now
+	accept socket_fd, $0, $0 
+	movq %rax, current_client_fd
+	write current_client_fd, $file_buff_ptr, file_size
+	close current_client_fd
+	jmp accept_loop
+
 	close socket_fd
 	jmp exit_program
 
