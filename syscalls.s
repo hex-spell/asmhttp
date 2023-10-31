@@ -121,11 +121,8 @@ _start:
 	movq %rax, file_size
 	lseek html_fd, $0, $0
 	#allocate memory for the website file
-	brk $0
+	mmap $0, file_size, $0x3, $0x22, $-1, $0
 	movq %rax, file_buff_ptr
-	addq file_size, %rax
-	movq %rax, current_data_addr
-	brk current_data_addr
 	#read the website file into memory
 	movq file_buff_ptr, %r14
 	read html_fd, %r14, file_size 
@@ -159,6 +156,8 @@ accept_loop:
 	#null addr and addrlen, I don't care about the client for now
 	accept socket_fd, $0, $0 
 	movq %rax, current_client_fd
+
+	#write response to client
 	movq file_buff_ptr, %r14
 	write current_client_fd, %r14, file_size
 	close current_client_fd
