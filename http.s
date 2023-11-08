@@ -7,6 +7,11 @@ strcomp_msg:
     .string "strcomp!\n\0"
 strcomp_msg_eq: #(debug)
     .string "equals!\n\0"
+# delimiters
+space_delimiter:
+    .string " "
+newline_delimiter:
+    .string "\n"
 # http verbs
 http_get:
     .string "GET"
@@ -25,11 +30,13 @@ http_post:
 .lcomm current_client_fd, 8
 .lcomm current_client_msg_buff_ptr, 8
 
+.lcomm substr_begin_ptr, 8
+.lcomm substr_end_ptr, 8
+.lcomm substr_length, 8
 
 
 .text
-.macro pushvolatiles
-    PUSH %rax
+.macro pushcallersaved
     PUSH %rdi
     PUSH %rsi
     PUSH %rdx
@@ -38,14 +45,13 @@ http_post:
     PUSH %r9 
 .endm
 
-.macro popvolatiles
+.macro popcallersaved
     POP %r9 
     POP %r8 
     POP %r10
     POP %rdx
     POP %rsi
     POP %rdi
-    POP %rax
 .endm
 
 .macro write fd, buf, len
@@ -186,6 +192,38 @@ strcomp_eq:
     movq $1, %rax
     ret
 #---------------------------------------------
+#---------------------------------------------
+# - charseek - seek char pos in string
+# - input registers:
+#	- RDI: char* (string)
+#	- RSI: char (character to seek)
+#	- RDX: int (maxlenth)
+# - output registers:
+#	- RAX: int64, char position relative to string mem location
+#		or size of the substring created from the beginning of the string
+#		to the char found
+#
+#	- RDI: char*, memory location for that character
+# - protip: you can call this multiple times and it will keep seeking past the first hit (if you don't change rsi)
+#---------------------------------------------
+charseek:
+    movq $0, %rax
+charseek_loop:
+    cmp $0, %rdx
+    jz charseek_not_found
+    movq (%rdi), %rcx
+    cmp %cl, %sil #byte 0 of rcx and rsi respectively
+    jz charseek_found
+    add $1, %rdi
+    add $1, %rax #counting chars
+    sub $1, %rdx
+    jmp charseek_loop
+charseek_not_found:
+    movq $-1, %rax
+    ret
+charseek_found:
+    ret
+ 
 
 .globl _start
 _start:
@@ -248,6 +286,22 @@ accept_loop:
     movq current_client_msg_buff_ptr, %rsi
     movq $3, %rdx
     call strcomp
+
+    #print requested path to screen
+    movq current_client_msg_buff_ptr, %rdi
+    movq space_delimiter, %rsi
+    movq $32, %rdx
+    call charseek 
+    add $1, %rdi
+    movq %rdi, substr_begin_ptr
+    movq $32, %rdx
+    call charseek
+    add $1, %rdi
+    movq %rdi, substr_end_ptr
+    movq %rax, substr_length
+    write $1, substr_begin_ptr, substr_length
+    write $1, $newline_delimiter, $1
+
     #write response to client
     movq file_buff_ptr, %r14
     write current_client_fd, %r14, file_size
