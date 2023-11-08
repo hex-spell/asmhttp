@@ -1,2 +1,2 @@
 #!/bin/sh
-as syscalls.s -o syscalls.o && ld syscalls.o -o syscalls
+as main.s -o ./build/main.o && ld ./build/main.o -o ./build/server

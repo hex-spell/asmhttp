@@ -1,19 +1,3 @@
-.data
-index_page:
-    .string "./index.http\0"
-server_listening_msg:
-    .string "chat server listening on port 11111\n\0"
-
-.bss
-.lcomm html_fd, 8
-.lcomm file_size, 8
-.lcomm file_buff_ptr, 8
-.lcomm socket_fd, 8
-.lcomm sockaddr, 8
-.lcomm current_client_fd, 8
-.lcomm current_data_addr, 8
-
-.text
 .macro write fd, buf, len
     movq $1, %rax #sys_write
     movq \fd, %rdi #std out (fd 1)
@@ -107,71 +91,14 @@ server_listening_msg:
     syscall
 .endm
 
-.globl _start
-_start:
-	#read index page file
-	open $index_page, $0x8000, $0
-
-	#check for file open error
-	#cmp %rax, $0
-	#jle exit_program_error
-
-	movq %rax, html_fd
-	lseek html_fd, $0, $2
-	movq %rax, file_size
-	lseek html_fd, $0, $0
-	#allocate memory for the website file
-	mmap $0, file_size, $0x3, $0x22, $-1, $0
-	movq %rax, file_buff_ptr
-	#read the website file into memory
-	movq file_buff_ptr, %r14
-	read html_fd, %r14, file_size 
-	close html_fd
-	write $1, %r14, file_size
-
-	#start server
-	socket $2, $1, $0
-
-	#check for socket open error
-	#cmp %rax, $0
-	#jle exit_program_error
-
-	movq %rax, socket_fd
-
-	#thank god I found this https://gist.github.com/geyslan/5174296
-	#I had no idea how to handle structs or the stack
-
-	push $0 #INADDR_ANY = 0 (uint32_t)
-	pushw $0x672b #port in byte reverse order = 11111 (uint16_t)
-	pushw $2 #AF_INET = 2 (unsigned short int)
-	movq %rsp, sockaddr #stack pointer = struct pointer atm
-	
-	#TODO: err handling for bind and listen
-	bind socket_fd, sockaddr, $16
-	listen socket_fd, $128
-
-	write $1, $server_listening_msg, $37
-
-accept_loop:
-	#null addr and addrlen, I don't care about the client for now
-	accept socket_fd, $0, $0 
-	movq %rax, current_client_fd
-
-	#write response to client
-	movq file_buff_ptr, %r14
-	write current_client_fd, %r14, file_size
-	close current_client_fd
-	jmp accept_loop
-
-	close socket_fd
-	jmp exit_program
-
-exit_program:
-    movq $60, %rax # exit(0)
-    movq $0, %rdi
+.macro recvfrom fd, ubuf_ptr, size, flags, sockaddr_ptr, addr_len_ptr
+    movq $45, %rax #sys_recvfrom
+    movq \fd, %rdi
+    movq \ubuf_ptr, %rsi
+    movq \size, %rdx
+    movq \flags, %r10
+    movq \sockaddr_ptr, %r8
+    movq \addr_len_ptr, %r9
     syscall
+.endm
 
-exit_program_error:
-    movq $60, %rax # exit(1)
-    movq $1, %rdi
-    syscall
