@@ -7,6 +7,9 @@ strcomp_msg:
     .string "strcomp!\n\0"
 strcomp_msg_eq: #(debug)
     .string "equals!\n\0"
+# directory scan
+open_directory:
+    .string "."
 # delimiters
 space_delimiter:
     .string " "
@@ -20,16 +23,25 @@ http_post:
 
 
 .bss
+#index.http file opening vars
 .lcomm html_fd, 8
 .lcomm file_size, 8
 .lcomm file_buff_ptr, 8
 
+#directory scan vars
+.lcomm dir_fd, 8
+.lcomm dirent_ptr, 8
+.lcomm dirent_size, 8
+
+#server socket vars
 .lcomm socket_fd, 8
 .lcomm sockaddr, 8
 
+#client socket vars
 .lcomm current_client_fd, 8
 .lcomm current_client_msg_buff_ptr, 8
 
+#charseek vars, used to get path from request
 .lcomm substr_begin_ptr, 8
 .lcomm substr_end_ptr, 8
 .lcomm substr_length, 8
@@ -43,6 +55,15 @@ http_post:
 
 .globl _start
 _start:
+    #create dir fd
+    open $open_directory, $0x10000, $0
+    movq %rax, dir_fd
+    mmap $0, $16384, $0x3, $0x22, $-1, $0
+    movq %rax, dirent_ptr
+    getdents64 dir_fd, dirent_ptr, $16384
+    movq %rax, dirent_size
+    write $1, dirent_ptr, dirent_size
+    
     #read index page file
     open $index_page, $0x8000, $0
 

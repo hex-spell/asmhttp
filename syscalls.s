@@ -102,3 +102,11 @@
     syscall
 .endm
 
+#dirent_ptr is linux_dirent64*
+.macro getdents64 fd, dirent_ptr, count
+    movq $217, %rax #sys_recvfrom
+    movq \fd, %rdi
+    movq \dirent_ptr, %rsi
+    movq \count, %rdx
+    syscall
+.endm
