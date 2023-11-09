@@ -9,7 +9,7 @@ strcomp_msg_eq: #(debug)
     .string "equals!\n\0"
 # directory scan
 open_directory:
-    .string "."
+    .string "./public_html"
 # delimiters
 space_delimiter:
     .string " "
@@ -63,6 +63,38 @@ _start:
     getdents64 dir_fd, dirent_ptr, $16384
     movq %rax, dirent_size
     write $1, dirent_ptr, dirent_size
+
+    #------------------------------------------------------
+    # TODO: map the dirent array
+    # to my own struct array format to act as a cache
+    # that would be:
+    #	struct directory {
+    #	    int64 name_length
+    #	    char* name
+    #	    int64 file_size (in bytes, starts as 0)
+    #	    int64 buff_ptr
+    #	}
+    # 
+    # The idea is to traverse this struct array
+    # searching for the filename
+    # if the file size is 0, that means that the file
+    # was not read to ram yet
+    # so I'd have to:
+    #	- call the open() syscall
+    #	- mmap the results
+    #	- change the values of file_size and buff_ptr in
+    #	    the array
+    #	- continue with the accept request flow
+    #
+    # Then the next time an user makes a request
+    # the file is already in memory, and I can skip the
+    # open() part
+    # NOTE: I can use the stack to keep track of the address
+    # of both file_size and buff_ptr
+    # Both are int64, so I should be able to push and pop
+    # To regular 64 bit registers without having to save
+    # pointers in .bss
+    #------------------------------------------------------
     
     #read index page file
     open $index_page, $0x8000, $0
