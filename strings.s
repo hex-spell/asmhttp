@@ -64,4 +64,30 @@ charseek_not_found:
     ret
 charseek_found:
     ret
+#---------------------------------------------
+# - strcopy - (address to address)
+# - input registers:
+#	- RDI: char* origin (null terminated)
+#	- RSI: char* destination
+#	- RDX: int64 (maxlenth)
+# - output registers:
+#	- RAX: size of the resulting string (with null terminator)
+# - used volatile registers:
+#	- RCX: used to dereference origin char before moving it to destination
+#---------------------------------------------
+strcopy:
+    movq $0, %rax
+strcopy_loop:
+    movq (%rdi), %rcx
+    movq %rcx, (%rsi)
+    cmp %cl, $0 #byte 0 of rcx is null (null terminator)
+    jz strcopy_finish
+    add $1, %rdi
+    add $1, %rsi
+    add $1, %rax #counting chars
+    sub $1, %rdx
+    cmp $0, %rdx
+    jnz strcopy_loop
+strcopy_finish:
+    ret
 
