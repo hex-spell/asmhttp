@@ -80,8 +80,8 @@ strcopy:
 strcopy_loop:
     movq (%rdi), %rcx
     movq %rcx, (%rsi)
-    cmp %cl, $0 #byte 0 of rcx is null (null terminator)
-    jz strcopy_finish
+    #cmp $0, %cl #byte 0 of rcx is null (null terminator)
+    #jz strcopy_finish
     add $1, %rdi
     add $1, %rsi
     add $1, %rax #counting chars

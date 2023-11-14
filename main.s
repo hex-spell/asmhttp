@@ -32,6 +32,7 @@ http_post:
 .lcomm dir_fd, 8
 .lcomm dirent_ptr, 8
 .lcomm dirent_size, 8
+.lcomm directory_ptr, 8
 
 #server socket vars
 .lcomm socket_fd, 8
@@ -59,11 +60,20 @@ _start:
     #create dir fd
     open $open_directory, $0x10000, $0
     movq %rax, dir_fd
+    #getting dirent
     mmap $0, $16384, $0x3, $0x22, $-1, $0
     movq %rax, dirent_ptr
     getdents64 dir_fd, dirent_ptr, $16384
     movq %rax, dirent_size
-    write $1, dirent_ptr, dirent_size
+    #write $1, dirent_ptr, dirent_size
+    #mapping dirent
+    mmap $0, $16384, $0x3, $0x22, $-1, $0
+    movq %rax, directory_ptr
+    movq dirent_ptr, %rdi
+    movq directory_ptr, %rsi
+    movq $10, %rdx
+    call map_site_cache
+    write $1, directory_ptr, $100
 
     #------------------------------------------------------
     # TODO: map the dirent array
