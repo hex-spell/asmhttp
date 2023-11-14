@@ -27,13 +27,37 @@ map_site_cache_loop:
     #the meaningful info starts after this address, idk why
     #maybe this offset can go away after I implement the byte search
     #explained below
-    add $64, %rdi
-    movq %rcx, %rdx
+    #add $64, %rdi
+    movq %rcx, %rdx #now rdx has dirent size
     #sub $64, %rdx
+    #-Saving regs before charseek-----
     push %rax
-    push %rdi
+    push %rsi
+
+#I can replace all of this with strcomp but whatever
+find_filename_loop:
+    movq $0x20, %rsi
     push %rdx
-    push %rcx
+    call charseek
+    pop %rdx
+    cmp %rax, %rdx #check if I'm out of bounds
+    jbe find_filename_finish
+    sub %rax, %rdx #I know I can cmp and sub at the same time
+    add $1, %rdi #but let's not complicate this more
+    movq (%rdi), %rcx
+    cmp $0x00, %cl
+    jz find_filename_loop_found_second
+    jmp find_filename_loop
+find_filename_loop_found_second:
+    add $1, %rdi
+    sub $1, %rdx
+    movq (%rdi), %rcx
+    cmp $0x08, %cl
+    jz find_filename_loop_found_third
+    jmp find_filename_loop
+find_filename_loop_found_third:
+    add $1, %rdi
+    sub $1, %rdx
     #----------------------------------------------------------------
     # - the string pointer is not being sent correctly
     #	the first char is always null
@@ -47,13 +71,18 @@ map_site_cache_loop:
     #	I can search for those bytes and then copy the string from there,
     #	stopping when I see a null terminator (0x00 byte)
     #----------------------------------------------------------------
+    #----------------------------------------------------------------
+    # - this worked, but now I get "index.asciiyA" for some reason 
+    #	I have to analize this struct more
+    #----------------------------------------------------------------
+    pop %rsi
     call strcopy
     # not saving rsi on purpose, that way I can
     # continue wrinting where I left off
-    pop %rcx
-    pop %rdx
-    pop %rdi
+find_filename_finish:
     pop %rax
+    #-Saving regs before strcopy------
+
     #sub $1, %rdx
     #cmp $0, %rdx
     #jnz map_site_cache_loop
