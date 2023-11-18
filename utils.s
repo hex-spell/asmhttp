@@ -1,4 +1,20 @@
 #---------------------------------------------
+# - the string pointer is not being sent correctly
+#	the first char is always null
+#	troubleshoot idea: print memory chunk that contains linux_dirent
+#	and translate the bytes to ascii characters, to see where
+#	the string exactly is. I'm sure I'm getting the offsets wrong
+#---------------------------------------------
+#---------------------------------------------
+# - looks like every file name is preceded by these bytes:
+#   0x20 0x00 0x08
+#	I can search for those bytes and then copy the string from there,
+#	stopping when I see a null terminator (0x00 byte)
+#---------------------------------------------
+#---------------------------------------------
+# - this worked, but now I get "index.asciiyA" for some reason 
+#	I have to analize this struct more
+#---------------------------------------------
 # x86 calling convention volatile args: RDI, RSI, RDX, RCX, R8, R9
 #---------------------------------------------
 # - map_site_cache - map linux_dirent64 struct to cache
@@ -16,71 +32,39 @@ map_site_cache:
     movq $0, %rax
 map_site_cache_loop:
     #!this crashes on the second iteration
-    movq %rdi, %r8
-    add $2, %r8
-    movq (%r8), %rcx
+    push %rdi
+    push %rsi
+    push %rdx
+    movq $0, %r9
+map_site_cache_string_found:
+    #add $18, %rdi
+    #add $18, %r9
+    call strcopy
+    add %rax, %r9
+map_site_cache_add_loop:
+    add $1, %rdi
+    add $1, %r9
+    cmpq $1000, %r9
+    jz map_site_cache_loop_finish
+    cmpb $0x08, (%rdi)
+    jnz map_site_cache_add_loop
+    jz map_site_cache_string_found
+map_site_cache_loop_finish:
+    pop %rdx
+    pop %rsi
+    pop %rdi
     #I added this cause I don't know if the access syntax changes
     #the source reg as a side effect (I must research this)
     #movq 2(%rdi), %rcx # (reclen (only first 16 bits))
-    movq $0xFFFFFFFFFFFF, %r8
-    and %r8, %rcx
+    #movq $0xFFFFFFFFFFFF, %r8
+    #and %r8, %rcx
     #the meaningful info starts after this address, idk why
     #maybe this offset can go away after I implement the byte search
     #explained below
     #add $64, %rdi
-    movq %rcx, %rdx #now rdx has dirent size
+    #movq %rcx, %rdx #now rdx has dirent size
     #sub $64, %rdx
-    #-Saving regs before charseek-----
-    push %rax
-    push %rsi
 
-#I can replace all of this with strcomp but whatever
-find_filename_loop:
-    movq $0x20, %rsi
-    push %rdx
-    call charseek
-    pop %rdx
-    cmp %rax, %rdx #check if I'm out of bounds
-    jbe find_filename_finish
-    sub %rax, %rdx #I know I can cmp and sub at the same time
-    add $1, %rdi #but let's not complicate this more
-    movq (%rdi), %rcx
-    cmp $0x00, %cl
-    jz find_filename_loop_found_second
-    jmp find_filename_loop
-find_filename_loop_found_second:
-    add $1, %rdi
-    sub $1, %rdx
-    movq (%rdi), %rcx
-    cmp $0x08, %cl
-    jz find_filename_loop_found_third
-    jmp find_filename_loop
-find_filename_loop_found_third:
-    add $1, %rdi
-    sub $1, %rdx
-    #----------------------------------------------------------------
-    # - the string pointer is not being sent correctly
-    #	the first char is always null
-    #	troubleshoot idea: print memory chunk that contains linux_dirent
-    #	and translate the bytes to ascii characters, to see where
-    #	the string exactly is. I'm sure I'm getting the offsets wrong
-    #----------------------------------------------------------------
-    #----------------------------------------------------------------
-    # - looks like every file name is preceded by these bytes:
-    #   0x20 0x00 0x08
-    #	I can search for those bytes and then copy the string from there,
-    #	stopping when I see a null terminator (0x00 byte)
-    #----------------------------------------------------------------
-    #----------------------------------------------------------------
-    # - this worked, but now I get "index.asciiyA" for some reason 
-    #	I have to analize this struct more
-    #----------------------------------------------------------------
-    pop %rsi
-    call strcopy
-    # not saving rsi on purpose, that way I can
-    # continue wrinting where I left off
-find_filename_finish:
-    pop %rax
     #-Saving regs before strcopy------
 
     #sub $1, %rdx

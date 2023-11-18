@@ -111,3 +111,12 @@
     syscall
 .endm
 
+.macro getdents fd, dirent_ptr, count
+    movq $78, %rax #sys_recvfrom
+    movq \fd, %rdi
+    movq \dirent_ptr, %rsi
+    movq \count, %rdx
+    syscall
+.endm
+
+
