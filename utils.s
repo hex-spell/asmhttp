@@ -30,44 +30,26 @@
 #---------------------------------------------:
 map_site_cache:
     movq $0, %rax
-map_site_cache_loop:
-    #!this crashes on the second iteration
-    push %rdi
-    push %rsi
-    push %rdx
     movq $0, %r9
+    movq $0, %r10
+    movq $0, %r11
+map_site_cache_loop:
+    movb 16(%rdi), %r9b #byte at offset 16 is dirent length
+    cmpb $0x08, 18(%rdi) #0x08 is dirent type file
+    jnz map_site_cache_goto_next_entry
 map_site_cache_string_found:
-    #add $18, %rdi
-    #add $18, %r9
+    push %rdi
+    push %rdx
+    movq $10, %rcx
+    addq $19, %rdi
+    movq $25, %rdx #max 25 chars for now
     call strcopy
-    add %rax, %r9
-map_site_cache_add_loop:
-    add $1, %rdi
-    add $1, %r9
-    cmpq $1000, %r9
-    jz map_site_cache_loop_finish
-    cmpb $0x08, (%rdi)
-    jnz map_site_cache_add_loop
-    jz map_site_cache_string_found
-map_site_cache_loop_finish:
+    add %rax, %r10 #r10 keeps track of the total string length
     pop %rdx
-    pop %rsi
     pop %rdi
-    #I added this cause I don't know if the access syntax changes
-    #the source reg as a side effect (I must research this)
-    #movq 2(%rdi), %rcx # (reclen (only first 16 bits))
-    #movq $0xFFFFFFFFFFFF, %r8
-    #and %r8, %rcx
-    #the meaningful info starts after this address, idk why
-    #maybe this offset can go away after I implement the byte search
-    #explained below
-    #add $64, %rdi
-    #movq %rcx, %rdx #now rdx has dirent size
-    #sub $64, %rdx
-
-    #-Saving regs before strcopy------
-
-    #sub $1, %rdx
-    #cmp $0, %rdx
-    #jnz map_site_cache_loop
+map_site_cache_goto_next_entry:
+    add %r9, %rdi #move dirent pointer to next dirent struct
+    add $1, %r11
+    cmp $5, %r11 #max 5 files for now
+    jle map_site_cache_loop
     ret
