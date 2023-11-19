@@ -34,7 +34,7 @@ map_site_cache_string_found:
     addq $19, %rdi
     #NOTE: this might cause an off by one error in the future
     #I have to take the null terminator into account
-    movq $47, %rdx #max 30 chars for now (31 with null terminator)
+    movq $47, %rdx #max 46 chars for now (47 with null terminator)
     call strcopy
     #--add entry length at the beginning
     addq %rax, %r10 #r10 keeps track of the total string length
