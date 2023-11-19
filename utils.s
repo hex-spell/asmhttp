@@ -120,11 +120,16 @@ read_file:
 #	}
 #
 #	struct directory {
-#	    char[36] name (null terminated)
-#	    int64 file_size (in bytes, starts as 0)
+#	    char name_length
+#	    char* name (null terminated) (hard limited to 46 chars)
 #	    int64 buff_ptr
-#	} total: 38 bytes per entry
+#	    int64 file_size
+#	} max: 64 bytes per entry
 # 
+# NOTE: the mapping is done, but I map everything, instead of
+# opening files when users request them, so what's below is a nice to have
+# but not yet implemented
+#
 # The idea is to traverse this struct array
 # searching for the filename
 # if the file size is 0, that means that the file
