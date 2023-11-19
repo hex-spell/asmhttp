@@ -75,44 +75,6 @@ _start:
     call map_site_cache
     write $1, directory_ptr, $100
 
-    #------------------------------------------------------
-    # TODO: map the dirent array
-    # to my own struct array format to act as a cache
-    # that would be:
-    #	struct linux_dirent64 {
-    #	    ino64_t        d_ino;    /* 64-bit inode number */
-    #	    off64_t        d_off;    /* 64-bit offset to next structure */
-    #	    unsigned short d_reclen; /* Size of this dirent */ short=16 bits
-    #	    unsigned char  d_type;   /* File type */
-    #	    char           d_name[]; /* Filename (null-terminated) */
-    #	}
-    #
-    #	struct directory {
-    #	    char[36] name (null terminated)
-    #	    int64 file_size (in bytes, starts as 0)
-    #	    int64 buff_ptr
-    #	} total: 38 bytes per entry
-    # 
-    # The idea is to traverse this struct array
-    # searching for the filename
-    # if the file size is 0, that means that the file
-    # was not read to ram yet
-    # so I'd have to:
-    #	- call the open() syscall
-    #	- mmap the results
-    #	- change the values of file_size and buff_ptr in
-    #	    the array
-    #	- continue with the accept request flow
-    #
-    # Then the next time an user makes a request
-    # the file is already in memory, and I can skip the
-    # open() part
-    # NOTE: I can use the stack to keep track of the address
-    # of both file_size and buff_ptr
-    # Both are int64, so I should be able to push and pop
-    # To regular 64 bit registers without having to save
-    # pointers in .bss
-    #------------------------------------------------------
     
     #read index page file
     open $index_page, $0x8000, $0
@@ -169,10 +131,10 @@ accept_loop:
     #write $1, current_client_msg_buff_ptr, $4
     #calling convention args: RDI, RSI, RDX, RCX, R8, R9
     # is get?
-    movq $http_get, %rdi
-    movq current_client_msg_buff_ptr, %rsi
-    movq $3, %rdx
-    call strcomp
+    #movq $http_get, %rdi
+    #movq current_client_msg_buff_ptr, %rsi
+    #movq $3, %rdx
+    #call strcomp
 
     #print requested path to screen
     movq current_client_msg_buff_ptr, %rdi

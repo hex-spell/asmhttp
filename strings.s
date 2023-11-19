@@ -43,6 +43,9 @@ strcomp_eq:
 #	- RAX: int64, char position relative to string mem location
 #		or size of the substring created from the beginning of the string
 #		to the char found
+#	#TODO: stop using RDI for output, and use memory and pointers instead
+#	the x86 calling convention says that I should use RAX as the only
+#	register for output
 #
 #	- RDI: char*, memory location for that character
 # - protip: you can call this multiple times and it will keep seeking past the first hit (if you don't change rsi)
@@ -89,5 +92,9 @@ strcopy_loop:
     cmp $0, %rdx
     jnz strcopy_loop
 strcopy_finish:
+    #-- add null terminator --
+    movq $0x0A, (%rsi)
+    add $1, %rsi
+    add $1, %rax
     ret
 
