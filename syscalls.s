@@ -6,6 +6,27 @@
     syscall
 .endm
 
+.macro print message_buff_ptr
+    push %rax
+    push %rdi
+    push %rsi
+    push %rdx
+    movq $1, %rax #sys_write
+    movq $1, %rdi #std out (fd 1)
+    movq \message_buff_ptr, %rsi #initial char ptr
+    movq $100, %rdx #count of chars to print
+    syscall
+    movq $1, %rax #sys_write
+    movq $1, %rdi #std out (fd 1)
+    movq $newline_delimiter, %rsi #initial char ptr
+    movq $1, %rdx #count of chars to print
+    syscall
+    pop %rdx
+    pop %rsi
+    pop %rdi
+    pop %rax
+.endm
+
 .macro open filename, flags, modes
     movq $2, %rax #sys_open
     movq \filename, %rdi #filename

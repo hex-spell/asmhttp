@@ -20,6 +20,10 @@ http_get:
     .string "GET"
 http_post:
     .string "POST"
+file_not_found:
+    .string "404, file not found \n\0"
+file_found:
+    .string "200, file found \n\0"
 
 
 .bss
@@ -33,6 +37,7 @@ http_post:
 .lcomm dirent_ptr, 8
 .lcomm dirent_size, 8
 .lcomm directory_ptr, 8
+.lcomm directory_length, 8
 
 #server socket vars
 .lcomm socket_fd, 8
@@ -47,6 +52,8 @@ http_post:
 .lcomm substr_end_ptr, 8
 .lcomm substr_length, 8
 
+#response vars
+.lcomm response_file_buffer_ptr, 8
 
 .text
 .include "syscalls.s"
@@ -73,8 +80,9 @@ _start:
     movq directory_ptr, %rsi
     movq $open_directory, %rdx
     call map_site_cache
-    write $1, directory_ptr, $100
-
+    movq %rax, directory_length
+    #write $1, directory_ptr, $100
+    
     
     #read index page file
     open $index_page, $0x8000, $0
@@ -145,15 +153,36 @@ accept_loop:
     movq %rdi, substr_begin_ptr
     movq $32, %rdx
     call charseek
-    add $1, %rdi
+    addq $1, %rdi
     movq %rdi, substr_end_ptr
     movq %rax, substr_length
     write $1, substr_begin_ptr, substr_length
     write $1, $newline_delimiter, $1
 
-    #write response to client
+    #search requested path in directory
+    movq directory_ptr, %rdi
+    movq directory_length, %rsi
+    movq substr_begin_ptr, %rdx
+    addq $1, %rdx #skip first "/"
+buffer_ptr_break:
+    movq $response_file_buffer_ptr, %rcx
+    call find_cache_entry
+    cmp $-1, %rax #if entry not found
+    jz entry_not_found 
+
+entry_found:
+    movq %rax, %r13 #if entry found
+    movq response_file_buffer_ptr, %r14
+    print $file_found
+    jmp write_response
+
+entry_not_found:
+    print $file_not_found
     movq file_buff_ptr, %r14
-    write current_client_fd, %r14, file_size
+    movq file_size, %r13
+
+write_response:
+    write current_client_fd, %r14, %r13
     close current_client_fd
     jmp accept_loop
 

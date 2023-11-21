@@ -1,3 +1,60 @@
+#---------------------------------------------
+# x86 calling convention volatile args: RDI, RSI, RDX, RCX, R8, R9
+#---------------------------------------------
+# - find_cache_entry - find file that was read using map_site_cache
+# - input registers:
+#	- RDI: directory*
+#	- RSI: directory* length
+#	- RDX: string* search
+#	- RCX : int64 pointer to file buffer (assigned by this function)
+# - output registers:
+#	- RAX: size of the file that was found (-1 if 404)
+# - used volatile registers:
+#	- R8: temporary struct pointer
+#---------------------------------------------:
+find_cache_entry:
+    movq $0, %rax
+find_cache_entry_loop:
+    cmp $0, %rsi
+    jz find_cache_entry_not_found
+    push %rdi
+    push %rsi
+    push %rdx
+    push %rcx
+    movq $0, %r8
+    movb (%rdi), %r8b #move string length to r8
+    addq $1, %rdi #move pointer to first char of file name
+    movq %rdx, %rsi #move string search to char* 2 arg of strcomp
+    subb $1, %r8b #remove null terminator from length
+    movq %r8, %rdx
+    addb $1, %r8b #return length to normal
+    push %r8
+    call strcomp
+    pop %r8
+    pop %rcx
+    pop %rdx
+    pop %rsi
+    pop %rdi
+    cmp $1, %rax
+    jz find_cache_entry_found
+    sub $1, %rsi
+    add $1, %rdi #jump to filename
+    add %r8, %rdi #jump to end of filename
+    add $16, %rdi #jump both address and buffer size
+    jmp find_cache_entry_loop
+find_cache_entry_not_found:
+    movq $-1, %rax
+    ret
+find_cache_entry_found:
+    add $1, %rdi #jump to filename
+    add %r8, %rdi #jump to end of filename
+    movq (%rdi), %r9
+    movq %r9, (%rcx)
+    add $8, %rdi #jump to file buffer size
+    movq (%rdi), %rax #file buffer size as the function output
+    ret
+
+
 .bss
 .lcomm concatenated_file_dir_ptr, 8
 .text
@@ -17,7 +74,6 @@
 #	- RCX: to dereference offset to next struct in origin
 #---------------------------------------------:
 map_site_cache:
-    movq $0, %rax
     movq $0, %r8
     movq $0, %r9
     movq $0, %r10
@@ -41,11 +97,14 @@ map_site_cache:
     pop %rsi
     pop %rdi
 
+    movq $0, %rax
+
 map_site_cache_loop:
     movb 16(%rdi), %r9b #byte at offset 16 is dirent length
     cmpb $0x08, 18(%rdi) #0x08 is dirent type file
     jnz map_site_cache_goto_next_entry
 map_site_cache_string_found:
+    push %rax
     push %rdi
     push %rdx
     push %r9
@@ -110,6 +169,8 @@ map_site_cache_string_found:
     pop %r9
     pop %rdx
     pop %rdi
+    pop %rax
+    addq $1, %rax
 map_site_cache_goto_next_entry:
     add %r9, %rdi #move dirent pointer to next dirent struct
     add $1, %r11
