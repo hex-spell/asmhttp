@@ -93,8 +93,70 @@ strcopy_loop:
     jnz strcopy_loop
 strcopy_finish:
     #-- add null terminator --
-    movq $0x0A, (%rsi)
+    movb $0x00, (%rsi)
     add $1, %rsi
+    add $1, %rax
+    ret
+#---------------------------------------------
+# - strcopy_raw - (address to address)
+# - input registers:
+#	- RDI: char* origin (null terminated)
+#	- RSI: char* destination
+#	- RDX: int64 (maxlenth)
+# - output registers:
+#	- RAX: size of the resulting string (with null terminator)
+# - used volatile registers:
+#	- RCX: used to dereference origin char before moving it to destination
+#---------------------------------------------
+strcopy_raw:
+    movq $0, %rax
+strcopy_raw_loop:
+    movq (%rdi), %rcx
+    movq %rcx, (%rsi)
+    cmp $0, %cl #byte 0 of rcx is null (null terminator)
+    jz strcopy_raw_finish
+    add $1, %rdi
+    add $1, %rsi
+    add $1, %rax #counting chars
+    sub $1, %rdx
+    cmp $0, %rdx
+    jnz strcopy_raw_loop
+strcopy_raw_finish:
+    ret
+
+#---------------------------------------------
+# - strcopy_multi - (address to two addresses)
+# - input registers:
+#	- RDI: char* origin (null terminated)
+#	- RSI: char* destination
+#	- RDX: char* destination 2
+#	- RCX: int64 (maxlenth)
+# - output registers:
+#	- RAX: size of the resulting string (with null terminator)
+# - used volatile registers:
+#	- R8: used to dereference origin char before moving it to destination
+#---------------------------------------------
+strcopy_multi:
+    movq $0, %rax
+strcopy_multi_loop:
+    movq (%rdi), %rcx
+    movq %rcx, (%rsi)
+    movq %rcx, (%rdx)
+    cmp $0, %cl #byte 0 of rcx is null (null terminator)
+    jz strcopy_multi_finish
+    add $1, %rdi
+    add $1, %rsi
+    add $1, %rdx
+    add $1, %rax #counting chars
+    sub $1, %r8
+    cmp $0, %r8
+    jnz strcopy_multi_loop
+strcopy_multi_finish:
+    #-- add null terminator --
+    movb $0x00, (%rsi)
+    movb $0x00, (%rdx)
+    add $1, %rsi
+    add $1, %rdx
     add $1, %rax
     ret
 

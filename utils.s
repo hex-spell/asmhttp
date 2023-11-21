@@ -1,3 +1,6 @@
+.bss
+.lcomm concatenated_file_dir_ptr, 8
+.text
 #---------------------------------------------
 # x86 calling convention volatile args: RDI, RSI, RDX, RCX, R8, R9
 #---------------------------------------------
@@ -5,7 +8,8 @@
 # - input registers:
 #	- RDI: linux_dirent64*
 #	- RSI: directory[]*
-#	- RDX: amount of dirent entries to map
+#	- RDX : char* base directory
+#	- RCX: amount of dirent entries to map
 #	    -	I use this value as a backwards counter for a loop
 # - output registers:
 #	- RAX: amount of entries mapped
@@ -18,6 +22,25 @@ map_site_cache:
     movq $0, %r9
     movq $0, %r10
     movq $0, %r11
+
+    #--- map memory for the concatenated directory and file name
+    push %rdi
+    push %rsi
+    push %rdx
+    push %r10
+    push %r11
+    push %r8
+    push %r9
+    mmap $0, $4096, $0x3, $0x22, $-1, $0
+    movq %rax, concatenated_file_dir_ptr
+    pop %r9
+    pop %r8
+    pop %r11
+    pop %r10
+    pop %rdx
+    pop %rsi
+    pop %rdi
+
 map_site_cache_loop:
     movb 16(%rdi), %r9b #byte at offset 16 is dirent length
     cmpb $0x08, 18(%rdi) #0x08 is dirent type file
@@ -28,27 +51,48 @@ map_site_cache_string_found:
     push %r9
     push %r11
 
+    #--- copy base directory to concat buffer
+    push %rsi
+    push %rdi
+    push %rcx
+    movq %rdx, %rdi #move base directory str* to strcopy args
+    movq concatenated_file_dir_ptr, %rsi 
+    call strcopy_raw
+    movq %rsi, %r8 #save the pointer to the end of the string
+    pop %rcx
+    pop %rdi
+    pop %rsi
+
+    #--- copy filename from dirent to directory* and concat
     push %rsi
     addq $1, %rsi #byte for entry length
     movq $10, %rcx
     addq $19, %rdi
     #NOTE: this might cause an off by one error in the future
     #I have to take the null terminator into account
-    movq $47, %rdx #max 46 chars for now (47 with null terminator)
-    call strcopy
-    #--add entry length at the beginning
+    push %rdx
+    push %rcx
+    push %r8
+    movq %r8, %rdx #end of base dir string*
+    movq $47, %rcx #max 46 chars for now (47 with null terminator)
+    call strcopy_multi
+    pop %r8
+    pop %rcx
+    pop %rdx
+
+    #--- add entry length at the beginning
     addq %rax, %r10 #r10 keeps track of the total string length
     movq %rsi, %r8
     popq %rsi
     movb %al, (%rsi)
 
+    #--- read file into memory and save adress in directory*
     push %r8
     push %r10
     push %rdi
     push %rsi
     movq %r8, %rsi #rsi = file buffer pointer
-    movq %rsi, %rdi
-    addq $1, %rdi #rdi = file name
+    movq concatenated_file_dir_ptr, %rdi #rdi = file dir
     call read_file
     pop %rsi
     pop %rdi
@@ -83,6 +127,11 @@ map_site_cache_goto_next_entry:
 # - output registers:
 #	- RAX: size of file read to memory 
 #---------------------------------------------:
+.bss
+.lcomm read_file_fd, 8
+.lcomm read_file_size, 8
+.lcomm read_file_buffer_ptr, 8
+.text
 read_file:
     #this is really dumb and not efficient at all
     push %rdi
@@ -90,21 +139,22 @@ read_file:
     movq %rdi, %r8 #r8 now has the char* filename
     open %r8, $0x8000, $0
 
-    movq %rax, %r8 #r8 now has the file descriptor
-    lseek %r8, $0, $2
-    movq %rax, %r9 #r9 now has the file size
-    lseek %r8, $0, $0
+    movq %rax, read_file_fd #r8 now has the file descriptor
+    lseek read_file_fd, $0, $2
+    movq %rax, read_file_size #r9 now has the file size
+    lseek read_file_fd, $0, $0
     #allocate memory for the website file
-    mmap $0, %r9, $0x3, $0x22, $-1, $0
-    movq %rax, %r10 #r10 now has the file buffer allocation pointer 
+    mmap $0, read_file_size, $0x3, $0x22, $-1, $0
+    movq %rax, read_file_buffer_ptr #r10 now has the file buffer allocation pointer 
     #read the website file into memory
-    read %r8, %r10, %r9
+    read read_file_fd, read_file_buffer_ptr, read_file_size
     pop %rsi
     pop %rdi
     #move the buff pointer to output address location
-    movq %r10, (%rsi)
-    close %r8
-    movq %r9, %rax
+    movq read_file_buffer_ptr, %r8
+    movq %r8, (%rsi)
+    close read_file_fd
+    movq read_file_size, %rax
     ret
 
 #------------------------------------------------------

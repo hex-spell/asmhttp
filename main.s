@@ -1,6 +1,6 @@
 .data
 index_page:
-    .string "./index.http\0"
+    .string "./public_html/index.http\0"
 server_listening_msg:
     .string "chat server listening on port 11111\n\0"
 strcomp_msg:
@@ -9,7 +9,7 @@ strcomp_msg_eq: #(debug)
     .string "equals!\n\0"
 # directory scan
 open_directory:
-    .string "./public_html"
+    .string "./public_html/"
 # delimiters
 space_delimiter:
     .string " "
@@ -71,7 +71,7 @@ _start:
     movq %rax, directory_ptr
     movq dirent_ptr, %rdi
     movq directory_ptr, %rsi
-    movq $10, %rdx
+    movq $open_directory, %rdx
     call map_site_cache
     write $1, directory_ptr, $100
 
