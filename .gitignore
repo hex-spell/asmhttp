@@ -1,2 +1,3 @@
 *.o
 /build/server
+bintoascii
