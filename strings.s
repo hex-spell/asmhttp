@@ -32,6 +32,7 @@ strcomp_neq:
 strcomp_eq:
     movq $1, %rax
     ret
+
 #---------------------------------------------
 #---------------------------------------------
 # - charseek - seek char pos in string
@@ -67,6 +68,7 @@ charseek_not_found:
     ret
 charseek_found:
     ret
+
 #---------------------------------------------
 # - strcopy - (address to address)
 # - input registers:
@@ -97,6 +99,7 @@ strcopy_finish:
     add $1, %rsi
     add $1, %rax
     ret
+
 #---------------------------------------------
 # - strcopy_raw - (address to address)
 # - input registers:
@@ -158,5 +161,46 @@ strcopy_multi_finish:
     add $1, %rsi
     add $1, %rdx
     add $1, %rax
+    ret
+
+#---------------------------------------------
+# - decimal_to_ascii 
+# - input registers:
+#	- RAX: uint32 number to convert
+#	- RSI: char* destination
+#	- RDX: max length
+# - output registers:
+#	- RAX: size of the resulting string (with null terminator)
+# look https://stackoverflow.com/questions/8021772/assembly-language-how-to-do-modulo for modulo of 10 operation
+#---------------------------------------------
+decimal_to_ascii:
+    mov $0, %r8
+    mov %rdx, %r9
+    mov $0, %rdx #clear higher bytes
+    mov $0, %rbx #||
+    mov $10, %ebx            # divisor can be any register or memory
+decimal_to_ascii_loop:
+    xor %edx, %edx            # dividend high half = 0.  prefer  xor edx,edx
+    div %ebx
+    add $48, %edx
+    push %rdx
+    add $1, %r8
+    cmp %r8, %r9
+    jz decimal_to_ascii_copy_loop
+    cmp $0, %eax
+    jnz decimal_to_ascii_loop
+decimal_to_ascii_copy_loop:
+    mov %r8, %rdx #save the string length
+decimal_to_ascii_copy_loop_begin:
+    cmp $0, %r8
+    jle decimal_to_ascii_copy_loop_end
+    pop %rax
+    movb %al, (%rsi)
+    add $1, %rsi
+    sub $1, %r8
+    cmp $0, %r8
+    jge decimal_to_ascii_copy_loop
+decimal_to_ascii_copy_loop_end:
+    mov %rdx, %rax
     ret
 
