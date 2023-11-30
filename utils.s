@@ -188,28 +188,54 @@ map_site_cache_goto_next_entry:
 # - output registers:
 #	- RAX: size of file read to memory 
 #---------------------------------------------:
+.data
+http_headers:
+    .string "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\nContent-Length: \0"
+http_begin_body:
+    .string "\n\n\0"
 .bss
 .lcomm read_file_fd, 8
 .lcomm read_file_size, 8
 .lcomm read_file_buffer_ptr, 8
+.lcomm before_content_length_ptr, 8
+.lcomm after_content_length_ptr, 8
+.lcomm begin_body_ptr, 8
 .text
 read_file:
     #this is really dumb and not efficient at all
     push %rdi
-    push %rsi
     movq %rdi, %r8 #r8 now has the char* filename
     open %r8, $0x8000, $0
 
     movq %rax, read_file_fd #r8 now has the file descriptor
     lseek read_file_fd, $0, $2
+    addq $4096, %rax #add space for http headers
     movq %rax, read_file_size #r9 now has the file size
     lseek read_file_fd, $0, $0
     #allocate memory for the website file
     mmap $0, read_file_size, $0x3, $0x22, $-1, $0
     movq %rax, read_file_buffer_ptr #r10 now has the file buffer allocation pointer 
+    #copy headers
+    movq $http_headers, %rdi
+    movq read_file_buffer_ptr, %rsi
+    movq $200, %rdx #arbitrary max length
+    call strcopy_raw
+    subq $1, %rsi #ignore null terminator
+    movq %rsi, before_content_length_ptr
+    movq read_file_size, %rax
+    #movq before_content_length_ptr, %rsi #this is not needed for now
+    movq $100, %rdx #arbitrary max length
+    call decimal_to_ascii
+    movq %rsi, after_content_length_ptr
+    #copy headers and body separator
+    movq $http_begin_body, %rdi
+    #movq after_content_length_ptr, %rsi #this is not needed for now
+    movq $10, %rdx #arbitrary max length 
+    call strcopy_raw
+    subq $1, %rsi #ignore null terminator
+    movq %rsi, begin_body_ptr
     #read the website file into memory
-    read read_file_fd, read_file_buffer_ptr, read_file_size
-    pop %rsi
+    read read_file_fd, begin_body_ptr, read_file_size
     pop %rdi
     #move the buff pointer to output address location
     movq read_file_buffer_ptr, %r8
